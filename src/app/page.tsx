@@ -77,6 +77,7 @@ export default function Home() {
   const [invoicePreview, setInvoicePreview] = useState<ExcelPreview | null>(null);
   const [recipientRawData, setRecipientRawData] = useState<any[]>([]);
   const [invoiceRawData, setInvoiceRawData] = useState<any[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Final processed data
   const [processedData, setProcessedData] = useState<Map<string, GroupedData> | null>(null);
@@ -84,8 +85,15 @@ export default function Home() {
 
   const { toast } = useToast();
 
+  // Load mount state
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Load stored data on mount
   useEffect(() => {
+    if (!isMounted) return;
+    
     // Load Recipients
     const storedRecipients = getRecipientDataFromStorage();
     if (storedRecipients) {
@@ -99,7 +107,7 @@ export default function Home() {
       }
       toast({
         title: "Sincronización Activa",
-        description: `${storedRecipients.recipientCount} destinatarios listos para usar.`,
+        description: `${storedRecipients.recipientCount} destinatarios rescatados de la sesión anterior.`,
       });
     }
 
@@ -108,7 +116,7 @@ export default function Home() {
     if (storedTemplate) {
       setEmailTemplate(storedTemplate);
     }
-  }, [toast]);
+  }, [isMounted, toast]);
 
   // Save template on change
   useEffect(() => {
@@ -302,10 +310,9 @@ export default function Home() {
     if (data.size === 0) {
       toast({
         variant: "destructive",
-        title: "Sin resultados",
-        description: "No se encontraron coincidencias. Revisa el mapeo de columnas en el paso 2.",
+        title: "No se encontraron coincidencias (RUC)",
+        description: "Asegúrese de cargar ambos archivos y que los RUC/identificadores coincidan. Use el paso de 'Mapear' si los nombres de las columnas son muy diferentes.",
       });
-      // Go to mapping step if auto-mapping failed
       setStep(2);
       return;
     }
@@ -385,6 +392,14 @@ export default function Home() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
+
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background selection:bg-primary/20">

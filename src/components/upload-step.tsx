@@ -313,15 +313,27 @@ export function UploadStep({
       </div>
 
       <div className="mt-16 flex flex-col items-center gap-6">
-        <Button
-          size="lg"
-          onClick={onProcess}
-          disabled={!invoiceFile}
-          className="h-16 px-10 text-lg font-bold shadow-2xl shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:grayscale"
-        >
-          Iniciar Procesamiento de Datos
-          <ArrowRight className="ml-2 h-6 w-6" />
-        </Button>
+        <div className="flex flex-col items-center gap-4">
+          <Button
+            size="lg"
+            onClick={onProcess}
+            disabled={!invoiceFile}
+            className={cn(
+              "h-16 px-10 text-lg font-bold shadow-2xl transition-all hover:scale-105 active:scale-95",
+              !invoiceFile 
+                ? "bg-muted text-muted-foreground cursor-not-allowed shadow-none border-2 border-muted" 
+                : "bg-primary text-primary-foreground shadow-primary/20"
+            )}
+          >
+            Iniciar Procesamiento de Datos
+            <ArrowRight className="ml-2 h-6 w-6" />
+          </Button>
+          {!invoiceFile && (storedRecipients || recipientFile) && (
+             <p className="text-xs font-black uppercase tracking-widest text-primary animate-bounce">
+                Por favor, cargue el archivo de comprobantes para continuar
+             </p>
+          )}
+        </div>
         
         <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
           <FileCheck className="h-4 w-4 text-primary" />
