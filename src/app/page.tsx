@@ -382,10 +382,28 @@ export default function Home() {
     setInvoiceFile(null);
     setRecipientPreview(null);
     setInvoicePreview(null);
-    setRecipientRawData([]);
     setInvoiceRawData([]);
-    setEmailTemplate(DEFAULT_EMAIL_TEMPLATE);
+    
+    // Clear and reload from storage if exists
+    setRecipientRawData([]);
+    const storedRecipients = getRecipientDataFromStorage();
+    if (storedRecipients) {
+      setRecipientRawData(storedRecipients.recipientData);
+      if (storedRecipients.recipientData.length > 0) {
+        const headers = Object.keys(storedRecipients.recipientData[0]);
+        setRecipientPreview({
+          headers,
+          firstRow: storedRecipients.recipientData[0]
+        });
+      }
+    }
+    
     setStep(1);
+
+    toast({
+      title: "Sesión Reiniciada",
+      description: "Se han limpiado los comprobantes. La base de destinatarios sigue activa si estaba sincronizada.",
+    });
   }
 
   // Scroll to top on step change
