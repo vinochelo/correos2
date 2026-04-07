@@ -69,6 +69,7 @@ function groupInvoicesByRecipient(recipients: Recipient[], invoices: Invoice[]):
 
 export default function Home() {
   const [step, setStep] = useState(1);
+  const [sentEmails, setSentEmails] = useState<Set<string>>(new Set());
   const [recipientFile, setRecipientFile] = useState<File | null>(null);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
 
@@ -163,11 +164,14 @@ export default function Home() {
 
           const allRowsFormatted = dataRows.map(row => {
             const rowData: any = {};
+            let hasData = false;
             headers.forEach((header, index) => {
-              rowData[header] = String(row[index] ?? '').trim();
+              const val = String(row[index] ?? '').trim();
+              rowData[header] = val;
+              if (val !== '') hasData = true;
             });
-            return rowData;
-          });
+            return hasData ? rowData : null;
+          }).filter(row => row !== null);
 
           resolve({
             headers,
@@ -265,6 +269,7 @@ export default function Home() {
     // Use provided mapping or auto-detect
     let autoRecipientMap: ColumnMapping;
     let autoInvoiceMap: ColumnMapping;
+    let autoDetectedSuccessfully = true;
 
     if (recipientMap && invoiceMap) {
       // User provided mapping from step 2
@@ -280,30 +285,49 @@ export default function Home() {
 
       recipientFields.forEach(field => {
         const header = findBestMatch(field, recipientPreview.headers);
-        if (header) autoRecipientMap[field] = header;
+        if (header) {
+          autoRecipientMap[field] = header;
+        } else {
+          // CODIGO is often optional, but for a robust mapping, let's just trigger mapping if major ones fall
+          if (field !== "CODIGO") autoDetectedSuccessfully = false;
+        }
       });
 
       invoiceFields.forEach(field => {
         const header = findBestMatch(field, invoicePreview.headers);
-        if (header) autoInvoiceMap[field] = header;
+        if (header) {
+          autoInvoiceMap[field] = header;
+        } else {
+          autoDetectedSuccessfully = false;
+        }
       });
+    }
+
+    if (!recipientMap && !invoiceMap && !autoDetectedSuccessfully) {
+      toast({
+        variant: "destructive",
+        title: "No se pudieron detectar las columnas",
+        description: "Por favor, mapea las columnas manualmente.",
+      });
+      setStep(2);
+      return;
     }
 
     // Map fields
     const mappedRecipients: Recipient[] = recipientRawData.map(row => ({
-      RUC: row[autoRecipientMap["RUC"]] || "",
-      NOMBRE: row[autoRecipientMap["NOMBRE"]] || "",
-      CORREO: row[autoRecipientMap["CORREO"]] || "",
-      CODIGO: row[autoRecipientMap["CODIGO"]] || "",
-    })).filter(r => !!r.RUC);
+      RUC: row[autoRecipientMap["RUC"] || ""] || "",
+      NOMBRE: row[autoRecipientMap["NOMBRE"] || ""] || "",
+      CORREO: row[autoRecipientMap["CORREO"] || ""] || "",
+      CODIGO: row[autoRecipientMap["CODIGO"] || ""] || "",
+    })).filter(r => !!r.RUC && r.RUC.trim() !== "");
 
     const mappedInvoices: Invoice[] = invoiceRawData.map(row => ({
-      RUC_EMISOR: row[autoInvoiceMap["RUC_EMISOR"]] || "",
-      RAZON_SOCIAL_EMISOR: row[autoInvoiceMap["RAZON_SOCIAL_EMISOR"]] || "",
-      TIPO_COMPROBANTE: row[autoInvoiceMap["TIPO_COMPROBANTE"]] || "",
-      SERIE_COMPROBANTE: row[autoInvoiceMap["SERIE_COMPROBANTE"]] || "",
-      OBSERVACIONES: row[autoInvoiceMap["OBSERVACIONES"]] || "",
-    })).filter(i => !!i.RUC_EMISOR);
+      RUC_EMISOR: row[autoInvoiceMap["RUC_EMISOR"] || ""] || "",
+      RAZON_SOCIAL_EMISOR: row[autoInvoiceMap["RAZON_SOCIAL_EMISOR"] || ""] || "",
+      TIPO_COMPROBANTE: row[autoInvoiceMap["TIPO_COMPROBANTE"] || ""] || "",
+      SERIE_COMPROBANTE: row[autoInvoiceMap["SERIE_COMPROBANTE"] || ""] || "",
+      OBSERVACIONES: row[autoInvoiceMap["OBSERVACIONES"] || ""] || "",
+    })).filter(i => !!i.RUC_EMISOR && i.RUC_EMISOR.trim() !== "");
 
     const data = groupInvoicesByRecipient(mappedRecipients, mappedInvoices);
 
@@ -349,8 +373,13 @@ export default function Home() {
     // 3. Synonyms
     const synonyms: Record<string, string[]> = {
       'correo': ['email', 'mail', 'e-mail', 'direccion', 'envio'],
-      'nombre': ['razon_social', 'razon', 'social', 'contacto'],
-      'ruc': ['identificador', 'id', 'nit', 'cedula'],
+      'nombre': ['razon_social', 'razon', 'social', 'contacto', 'nombres', 'cliente', 'proveedor'],
+      'ruc': ['identificador', 'id', 'nit', 'cedula', 'ruc_emisor', 'identificacion'],
+      'observaciones': ['status', 'estado', 'observacion', 'nota', 'comentario', 'detalle', 'descripcion'],
+      'tipo_comprobante': ['tipo', 'documento', 'comprobante', 'doc'],
+      'serie_comprobante': ['serie', 'nro', 'numero', 'secuencial', 'num'],
+      'razon_social_emisor': ['razon_social', 'nombre', 'emisor', 'cliente'],
+      'ruc_emisor': ['ruc', 'id', 'identificacion', 'nit']
     };
 
     if (synonyms[fieldLower]) {
@@ -378,6 +407,7 @@ export default function Home() {
 
   const handleStartOver = () => {
     setProcessedData(null);
+    setSentEmails(new Set());
     setRecipientFile(null);
     setInvoiceFile(null);
     setRecipientPreview(null);
@@ -426,7 +456,7 @@ export default function Home() {
         <div className="absolute inset-x-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/10 opacity-20 blur-[100px]"></div>
       </div>
       
-      <Header />
+      <Header step={step} emailsSent={sentEmails.size} totalEmails={processedData ? processedData.size : 0} />
       
       <main className="relative pt-12 pb-24">
         <div className="max-w-4xl mx-auto px-4 mb-20">
@@ -498,6 +528,8 @@ export default function Home() {
                     emailTemplate={emailTemplate}
                     onBack={handleBack}
                     onStartOver={handleStartOver}
+                    sentEmails={sentEmails}
+                    setSentEmails={setSentEmails}
                   />
                 </div>
               )}

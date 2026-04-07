@@ -12,6 +12,8 @@ interface GenerateStepProps {
   emailTemplate: string;
   onBack: () => void;
   onStartOver: () => void;
+  sentEmails: Set<string>;
+  setSentEmails: (emails: Set<string>) => void;
 }
 
 function generateInvoicesTable(invoices: Invoice[]): string {
@@ -41,8 +43,7 @@ function generateEmailBody(template: string, groupedData: GroupedData): string {
 
 import { motion } from "framer-motion";
 
-export function GenerateStep({ data, emailTemplate, onBack, onStartOver }: GenerateStepProps) {
-  const [sentEmails, setSentEmails] = useState<Set<string>>(new Set());
+export function GenerateStep({ data, emailTemplate, onBack, onStartOver, sentEmails, setSentEmails }: GenerateStepProps) {
   const dataArray = Array.from(data.values());
   const totalEmails = dataArray.length;
   const emailsWithContact = dataArray.filter(d => !!d.recipient.CORREO).length;

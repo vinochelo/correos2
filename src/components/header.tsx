@@ -1,6 +1,12 @@
 import { LogoIcon } from '@/components/icons/logo-icon';
 
-export function Header() {
+interface HeaderProps {
+  step?: number;
+  emailsSent?: number;
+  totalEmails?: number;
+}
+
+export function Header({ step, emailsSent, totalEmails }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-xl">
       <div className="container flex h-20 items-center justify-between">
@@ -18,10 +24,19 @@ export function Header() {
           </div>
         </div>
         <div className="hidden sm:flex items-center gap-4">
-          <div className="h-8 w-[1px] bg-border" />
-          <p className="text-xs text-muted-foreground font-medium italic">
-            "Eficiencia y orden en su facturación"
-          </p>
+          {step === 4 && totalEmails !== undefined && emailsSent !== undefined ? (
+            <>
+              <div className="h-8 w-[1px] bg-border" />
+              <div className="flex flex-col items-end">
+                <p className="text-xs text-foreground font-bold tracking-tight">
+                  <span className="text-primary">{emailsSent}</span> de {totalEmails} Enviados
+                </p>
+                <div className="w-24 h-1.5 bg-muted rounded-full mt-1 overflow-hidden">
+                  <div className="h-full bg-primary transition-all duration-500" style={{ width: `${totalEmails > 0 ? (emailsSent / totalEmails) * 100 : 0}%` }} />
+                </div>
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
     </header>
