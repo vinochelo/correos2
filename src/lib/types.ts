@@ -17,3 +17,12 @@ export interface GroupedData {
   recipient: Recipient;
   invoices: Invoice[];
 }
+
+export interface ColumnMapping {
+  [key: string]: string; // clave del objeto -> nombre de la columna en Excel
+}
+
+export interface ExcelPreview {
+  headers: string[];
+  firstRow: Record<string, string>;
+}

@@ -1,16 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { Header } from "@/components/header";
 import { Stepper } from "@/components/stepper";
 import { UploadStep } from "@/components/upload-step";
+import { MappingStep } from "@/components/mapping-step";
 import { PreviewStep } from "@/components/preview-step";
 import { GenerateStep } from "@/components/generate-step";
+import { Settings2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-import type { Recipient, Invoice, GroupedData } from "@/lib/types";
+import type { Recipient, Invoice, GroupedData, ColumnMapping, ExcelPreview } from "@/lib/types";
+import type { StoredRecipientData } from "@/lib/storage-utils";
+import { saveRecipientDataToStorage, getRecipientDataFromStorage, saveTemplateToStorage, getTemplateFromStorage } from "@/lib/storage-utils";
 import { useToast } from "@/hooks/use-toast";
 import { Analytics } from "@vercel/analytics/react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const DEFAULT_EMAIL_TEMPLATE = `Estimados señores de {{razon_social_emisor}},
 
@@ -23,6 +29,9 @@ El motivo de la anulación junto con el detalle de los comprobantes, se encuentr
 {{invoices_table}}
 `;
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
 
 function groupInvoicesByRecipient(recipients: Recipient[], invoices: Invoice[]): Map<string, GroupedData> {
   const cleanString = (val: any): string => String(val || '').trim();
@@ -43,7 +52,7 @@ function groupInvoicesByRecipient(recipients: Recipient[], invoices: Invoice[]):
         CORREO: '', // Mark as no email found
         CODIGO: ''
       };
-      
+
       grouped.set(rucEmisor, {
         recipient: initialRecipientData,
         invoices: [],
@@ -60,17 +69,66 @@ function groupInvoicesByRecipient(recipients: Recipient[], invoices: Invoice[]):
 
 export default function Home() {
   const [step, setStep] = useState(1);
-  const [recipients, setRecipients] = useState<Recipient[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [recipientFile, setRecipientFile] = useState<File | null>(null);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+
+  // Data for mapping
+  const [recipientPreview, setRecipientPreview] = useState<ExcelPreview | null>(null);
+  const [invoicePreview, setInvoicePreview] = useState<ExcelPreview | null>(null);
+  const [recipientRawData, setRecipientRawData] = useState<any[]>([]);
+  const [invoiceRawData, setInvoiceRawData] = useState<any[]>([]);
+
+  // Final processed data
   const [processedData, setProcessedData] = useState<Map<string, GroupedData> | null>(null);
   const [emailTemplate, setEmailTemplate] = useState<string>(DEFAULT_EMAIL_TEMPLATE);
+
   const { toast } = useToast();
 
-  const STEPS = ["Subir Datos", "Previsualizar", "Generar Correos"];
+  // Load stored data on mount
+  useEffect(() => {
+    // Load Recipients
+    const storedRecipients = getRecipientDataFromStorage();
+    if (storedRecipients) {
+      setRecipientRawData(storedRecipients.recipientData);
+      if (storedRecipients.recipientData.length > 0) {
+        const headers = Object.keys(storedRecipients.recipientData[0]);
+        setRecipientPreview({
+          headers,
+          firstRow: storedRecipients.recipientData[0]
+        });
+      }
+      toast({
+        title: "Sincronización Activa",
+        description: `${storedRecipients.recipientCount} destinatarios listos para usar.`,
+      });
+    }
 
-  const parseFile = <T extends Record<string, any>>(file: File, startRow: number): Promise<T[]> => {
+    // Load Template
+    const storedTemplate = getTemplateFromStorage();
+    if (storedTemplate) {
+      setEmailTemplate(storedTemplate);
+    }
+  }, [toast]);
+
+  // Save template on change
+  useEffect(() => {
+    if (emailTemplate !== DEFAULT_EMAIL_TEMPLATE) {
+      saveTemplateToStorage(emailTemplate);
+    }
+  }, [emailTemplate]);
+
+  const handleResetTemplate = () => {
+    setEmailTemplate(DEFAULT_EMAIL_TEMPLATE);
+    localStorage.removeItem('hola-mails-template');
+    toast({
+      title: "Mensaje Reiniciado",
+      description: "Se ha restaurado el formato predeterminado.",
+    });
+  };
+
+  const STEPS = ["Subir Datos", "Mapear", "Previsualizar", "Generar"];
+
+  const parseFilePreview = (file: File, startRow: number): Promise<{ headers: string[], firstRow: any, allRows: any[] }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -79,38 +137,36 @@ export default function Home() {
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          
+
           const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, {
             header: 1,
             defval: "",
-            raw: false, 
+            raw: false,
           });
 
-          if (rows.length < startRow) {
-            resolve([]);
-            return;
-          }
-          
           const headerRowIndex = startRow > 1 ? startRow - 2 : 0;
           if (rows.length <= headerRowIndex) {
-             reject(new Error(`La fila de encabezado (${headerRowIndex + 1}) no existe en el archivo.`));
-             return;
+            reject(new Error(`La fila de encabezado no existe.`));
+            return;
           }
-          const header = rows[headerRowIndex].map(h => String(h || '').trim());
-          
+
+          const headers = rows[headerRowIndex].map(h => String(h || '').trim()).filter(h => h !== "");
           const dataRows = rows.slice(startRow - 1);
 
-          const json = dataRows.map(row => {
-            const rowData: T = {} as T;
-            header.forEach((key, index) => {
-              rowData[key as keyof T] = String(row[index] ?? '').trim() as T[keyof T];
+          const allRowsFormatted = dataRows.map(row => {
+            const rowData: any = {};
+            headers.forEach((header, index) => {
+              rowData[header] = String(row[index] ?? '').trim();
             });
             return rowData;
           });
 
-          resolve(json);
+          resolve({
+            headers,
+            firstRow: allRowsFormatted[0] || {},
+            allRows: allRowsFormatted
+          });
         } catch (error) {
-          console.error("Error parsing file:", error);
           reject(error);
         }
       };
@@ -118,118 +174,326 @@ export default function Home() {
       reader.readAsArrayBuffer(file);
     });
   };
-  
+
   const handleRecipientsUpload = async (file: File, startRow: number) => {
     setRecipientFile(file);
     try {
-        const parsedRecipients = await parseFile<Recipient>(file, startRow);
-        setRecipients(parsedRecipients);
-        toast({
-            title: "Archivo de destinatarios cargado",
-            description: `Se encontraron ${parsedRecipients.length} destinatarios.`,
-        });
-    } catch(e) {
-        toast({
-            variant: "destructive",
-            title: "Error al leer el archivo",
-            description: e instanceof Error ? e.message : "Asegúrate de que es un archivo Excel válido y la fila de inicio es correcta.",
-        });
-        setRecipientFile(null);
+      const { headers, firstRow, allRows } = await parseFilePreview(file, startRow);
+      setRecipientPreview({ headers, firstRow });
+      setRecipientRawData(allRows);
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Error en destinatarios",
+        description: "No se pudo leer el archivo de destinatarios.",
+      });
+      setRecipientFile(null);
     }
   };
 
   const handleInvoicesUpload = async (file: File, startRow: number) => {
     setInvoiceFile(file);
-     try {
-        const parsedInvoices = await parseFile<Invoice>(file, startRow);
-        setInvoices(parsedInvoices);
-        toast({
-            title: "Archivo de comprobantes cargado",
-            description: `Se encontraron ${parsedInvoices.length} comprobantes.`,
-        });
-    } catch(e) {
-        toast({
-            variant: "destructive",
-            title: "Error al leer el archivo",
-            description: e instanceof Error ? e.message : "Asegúrate de que es un archivo Excel válido y la fila de inicio es correcta.",
-        });
-        setInvoiceFile(null);
+    try {
+      const { headers, firstRow, allRows } = await parseFilePreview(file, startRow);
+      setInvoicePreview({ headers, firstRow });
+      setInvoiceRawData(allRows);
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Error en comprobantes",
+        description: "No se pudo leer el archivo de comprobantes.",
+      });
+      setInvoiceFile(null);
     }
   };
 
+  const handleLoadRecipients = (data: StoredRecipientData) => {
+    setRecipientRawData(data.recipientData);
 
-  const handleProcess = () => {
-    if (recipients.length === 0 || invoices.length === 0) {
+    if (data.recipientData.length > 0) {
+      const headers = Object.keys(data.recipientData[0]);
+      setRecipientPreview({
+        headers,
+        firstRow: data.recipientData[0]
+      });
+    }
+
+    toast({
+      title: "Destinatarios cargados",
+      description: `${data.recipientCount} destinatarios listos para usar.`,
+    });
+  };
+
+
+  const handleStartMapping = () => {
+    if (!invoicePreview) {
       toast({
         variant: "destructive",
-        title: "Faltan archivos",
-        description: "Por favor, sube ambos archivos para continuar.",
+        title: "Falta archivo de comprobantes",
+        description: "Sube el archivo de comprobantes para continuar.",
       });
       return;
     }
-    
+
+    // Auto-process and skip to preview (step 3) by default
+    handleProcessAndContinue();
+  };
+
+  const handleProcessAndContinue = (recipientMap?: ColumnMapping, invoiceMap?: ColumnMapping) => {
+    if (!recipientPreview || !invoicePreview) {
+      toast({
+        variant: "destructive",
+        title: "Faltan archivos",
+        description: "Sube ambos archivos para continuar.",
+      });
+      return;
+    }
+
     toast({
-      title: "Procesando datos...",
-      description: "Agrupando facturas por emisor.",
+      title: "Procesando...",
+      description: "Transformando datos de Excel.",
     });
 
-    setTimeout(() => {
-      const data = groupInvoicesByRecipient(recipients, invoices);
-      if (data.size === 0) {
-          toast({
-            variant: "destructive",
-            title: "No se procesaron datos",
-            description: "No se pudo agrupar ningún comprobante. Revisa que los archivos y la fila de inicio sean correctos.",
-          });
-          return;
-      }
-      setProcessedData(data);
-      setStep(2);
-      toast({
-        title: "¡Éxito!",
-        description: `Se agruparon los comprobantes para ${data.size} emisores.`,
+    // Use provided mapping or auto-detect
+    let autoRecipientMap: ColumnMapping;
+    let autoInvoiceMap: ColumnMapping;
+
+    if (recipientMap && invoiceMap) {
+      // User provided mapping from step 2
+      autoRecipientMap = recipientMap;
+      autoInvoiceMap = invoiceMap;
+    } else {
+      // Auto-detect mapping using intelligent matching
+      autoRecipientMap = {};
+      autoInvoiceMap = {};
+
+      const recipientFields = ["RUC", "NOMBRE", "CORREO", "CODIGO"];
+      const invoiceFields = ["RUC_EMISOR", "RAZON_SOCIAL_EMISOR", "TIPO_COMPROBANTE", "SERIE_COMPROBANTE", "OBSERVACIONES"];
+
+      recipientFields.forEach(field => {
+        const header = findBestMatch(field, recipientPreview.headers);
+        if (header) autoRecipientMap[field] = header;
       });
-    }, 1000);
+
+      invoiceFields.forEach(field => {
+        const header = findBestMatch(field, invoicePreview.headers);
+        if (header) autoInvoiceMap[field] = header;
+      });
+    }
+
+    // Map fields
+    const mappedRecipients: Recipient[] = recipientRawData.map(row => ({
+      RUC: row[autoRecipientMap["RUC"]] || "",
+      NOMBRE: row[autoRecipientMap["NOMBRE"]] || "",
+      CORREO: row[autoRecipientMap["CORREO"]] || "",
+      CODIGO: row[autoRecipientMap["CODIGO"]] || "",
+    })).filter(r => !!r.RUC);
+
+    const mappedInvoices: Invoice[] = invoiceRawData.map(row => ({
+      RUC_EMISOR: row[autoInvoiceMap["RUC_EMISOR"]] || "",
+      RAZON_SOCIAL_EMISOR: row[autoInvoiceMap["RAZON_SOCIAL_EMISOR"]] || "",
+      TIPO_COMPROBANTE: row[autoInvoiceMap["TIPO_COMPROBANTE"]] || "",
+      SERIE_COMPROBANTE: row[autoInvoiceMap["SERIE_COMPROBANTE"]] || "",
+      OBSERVACIONES: row[autoInvoiceMap["OBSERVACIONES"]] || "",
+    })).filter(i => !!i.RUC_EMISOR);
+
+    const data = groupInvoicesByRecipient(mappedRecipients, mappedInvoices);
+
+    if (data.size === 0) {
+      toast({
+        variant: "destructive",
+        title: "Sin resultados",
+        description: "No se encontraron coincidencias. Revisa el mapeo de columnas en el paso 2.",
+      });
+      // Go to mapping step if auto-mapping failed
+      setStep(2);
+      return;
+    }
+
+    // Save only recipients to localStorage
+    const storageData: StoredRecipientData = {
+      recipientData: recipientRawData,
+      timestamp: new Date().toISOString(),
+      recipientCount: mappedRecipients.length,
+    };
+    saveRecipientDataToStorage(storageData);
+
+    setProcessedData(data);
+    setStep(3);
+
+    toast({
+      title: "¡Éxito!",
+      description: `Se agruparon datos para ${data.size} emisores.`,
+    });
+  };
+
+  // Intelligent matching function
+  const findBestMatch = (field: string, headers: string[]): string | undefined => {
+    const fieldLower = field.toLowerCase();
+
+    // 1. Exact match
+    const exact = headers.find(h => h.toLowerCase() === fieldLower);
+    if (exact) return exact;
+
+    // 2. Contains match
+    const contains = headers.find(h => h.toLowerCase().includes(fieldLower) || fieldLower.includes(h.toLowerCase()));
+    if (contains) return contains;
+
+    // 3. Synonyms
+    const synonyms: Record<string, string[]> = {
+      'correo': ['email', 'mail', 'e-mail', 'direccion', 'envio'],
+      'nombre': ['razon_social', 'razon', 'social', 'contacto'],
+      'ruc': ['identificador', 'id', 'nit', 'cedula'],
+    };
+
+    if (synonyms[fieldLower]) {
+      const synonymMatch = headers.find(h =>
+        synonyms[fieldLower].some(s => h.toLowerCase().includes(s))
+      );
+      if (synonymMatch) return synonymMatch;
+    }
+
+    return undefined;
   };
 
   const handleGenerate = () => {
-    setStep(3);
+    setStep(4);
   };
-  
+
   const handleBack = () => {
-    if (step > 1) {
-      if (step === 2) {
-          setProcessedData(null);
-      }
+    if (step === 3) {
+      // Skip step 2 when going back from step 3
+      setStep(1);
+    } else if (step > 1) {
       setStep(step - 1);
     }
   };
-  
+
   const handleStartOver = () => {
     setProcessedData(null);
-    setRecipients([]);
-    setInvoices([]);
     setRecipientFile(null);
     setInvoiceFile(null);
+    setRecipientPreview(null);
+    setInvoicePreview(null);
+    setRecipientRawData([]);
+    setInvoiceRawData([]);
     setEmailTemplate(DEFAULT_EMAIL_TEMPLATE);
     setStep(1);
   }
 
+  // Scroll to top on step change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
+
   return (
-    <>
+    <div className="min-h-screen bg-background selection:bg-primary/20">
+      {/* Background decoration */}
+      <div className="fixed inset-0 -z-10 h-full w-full bg-background bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:40px_40px]">
+        <div className="absolute inset-x-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/10 opacity-20 blur-[100px]"></div>
+      </div>
+      
       <Header />
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        <div className="max-w-3xl mx-auto mb-16 flex justify-center">
-            <Stepper currentStep={step} steps={STEPS} />
+      
+      <main className="relative pt-12 pb-24">
+        <div className="max-w-4xl mx-auto px-4 mb-20">
+          <Stepper currentStep={step} steps={STEPS} />
         </div>
-        
-        <div className="max-w-7xl mx-auto">
-          {step === 1 && <UploadStep onProcess={handleProcess} onRecipientsUpload={handleRecipientsUpload} onInvoicesUpload={handleInvoicesUpload} recipientFile={recipientFile} invoiceFile={invoiceFile} />}
-          {step === 2 && processedData && <PreviewStep data={processedData} emailTemplate={emailTemplate} onTemplateChange={setEmailTemplate} onNext={handleGenerate} onBack={handleBack} />}
-          {step === 3 && processedData && <GenerateStep data={processedData} emailTemplate={emailTemplate} onBack={handleBack} onStartOver={handleStartOver} />}
+
+        <div className="container mx-auto px-4 px-6 lg:px-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ 
+                duration: 0.4, 
+                ease: [0.22, 1, 0.36, 1] 
+              }}
+            >
+              {step === 1 && (
+                <UploadStep
+                  onProcess={handleStartMapping}
+                  onRecipientsUpload={handleRecipientsUpload}
+                  onInvoicesUpload={handleInvoicesUpload}
+                  onLoadRecipients={handleLoadRecipients}
+                  recipientFile={recipientFile}
+                  invoiceFile={invoiceFile}
+                />
+              )}
+
+              {step === 2 && recipientPreview && invoicePreview && (
+                <MappingStep
+                  recipientPreview={recipientPreview}
+                  invoicePreview={invoicePreview}
+                  onMap={handleProcessAndContinue}
+                  onBack={handleBack}
+                />
+              )}
+
+              {step === 3 && processedData && (
+                <PreviewStep
+                  data={processedData}
+                  emailTemplate={emailTemplate}
+                  onTemplateChange={setEmailTemplate}
+                  onNext={handleGenerate}
+                  onBack={handleBack}
+                  onEditMapping={() => setStep(2)}
+                  onResetTemplate={handleResetTemplate}
+                />
+              )}
+
+              {step === 4 && processedData && (
+                <div className="space-y-8">
+                  {processedData.size > 100 && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="max-w-xl mx-auto p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-4 shadow-sm"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white">
+                        <Settings2 className="h-5 w-5" />
+                      </div>
+                      <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-tight leading-relaxed">
+                        Límite de Procesamiento de Lote detectado. Se recomienda el envío en bloques para evitar saturación del cliente Outlook/Mail local.
+                      </p>
+                    </motion.div>
+                  )}
+                  <GenerateStep
+                    data={processedData}
+                    emailTemplate={emailTemplate}
+                    onBack={handleBack}
+                    onStartOver={handleStartOver}
+                  />
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
+
+      <footer className="border-t bg-muted/20 py-12">
+        <div className="container mx-auto px-4 flex flex-col items-center gap-6 text-center">
+          <div className="flex items-center gap-4 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all duration-500">
+             <div className="h-8 w-8 rounded bg-foreground flex items-center justify-center text-background font-black text-xs">V2</div>
+             <div className="h-px w-8 bg-muted-foreground/30"></div>
+             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Correos Pro Enterprise</p>
+          </div>
+          <div className="max-w-md">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider leading-relaxed">
+              Herramienta de nivel industrial desarrollada bajo protocolos de seguridad locales. 
+              Ningún dato abandona su navegador. Basado en arquitectura Client-Side-Only.
+            </p>
+          </div>
+          <div className="flex items-center gap-6">
+            <span className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-widest">Privacy Secured</span>
+             <span className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-widest">TLS 1.3 Readiness</span>
+             <span className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-widest">MIT License</span>
+          </div>
+        </div>
+      </footer>
       <Analytics />
-    </>
+    </div>
   );
 }
