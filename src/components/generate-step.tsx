@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 interface GenerateStepProps {
   data: Map<string, GroupedData>;
   emailTemplate: string;
+  emailSubject: string;
   onBack: () => void;
   onStartOver: () => void;
   sentEmails: Set<string>;
@@ -25,7 +26,7 @@ function generateInvoicesTable(invoices: Invoice[]): string {
 }
 
 
-function generateEmailBody(template: string, groupedData: GroupedData): string {
+function generateFromTemplate(template: string, groupedData: GroupedData): string {
   const { recipient, invoices } = groupedData;
   const razonSocial = recipient.NOMBRE || invoices[0]?.RAZON_SOCIAL_EMISOR;
   const rucEmisor = recipient.RUC || invoices[0]?.RUC_EMISOR;
@@ -43,7 +44,7 @@ function generateEmailBody(template: string, groupedData: GroupedData): string {
 
 import { motion } from "framer-motion";
 
-export function GenerateStep({ data, emailTemplate, onBack, onStartOver, sentEmails, setSentEmails }: GenerateStepProps) {
+export function GenerateStep({ data, emailTemplate, emailSubject, onBack, onStartOver, sentEmails, setSentEmails }: GenerateStepProps) {
   const dataArray = Array.from(data.values());
   const totalEmails = dataArray.length;
   const emailsWithContact = dataArray.filter(d => !!d.recipient.CORREO).length;
@@ -110,8 +111,8 @@ export function GenerateStep({ data, emailTemplate, onBack, onStartOver, sentEma
           const isSent = sentEmails.has(recipient.RUC);
           const hasEmail = !!recipientEmails;
           const razonSocial = recipient.NOMBRE || invoices[0]?.RAZON_SOCIAL_EMISOR;
-          const subject = `Comunicación Institucional - Detalle de Comprobantes`;
-          const body = generateEmailBody(emailTemplate, groupedData);
+          const subject = generateFromTemplate(emailSubject, groupedData);
+          const body = generateFromTemplate(emailTemplate, groupedData);
 
           return (
             <motion.div

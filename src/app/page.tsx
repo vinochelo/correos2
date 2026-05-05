@@ -13,7 +13,14 @@ import { Button } from "@/components/ui/button";
 
 import type { Recipient, Invoice, GroupedData, ColumnMapping, ExcelPreview } from "@/lib/types";
 import type { StoredRecipientData } from "@/lib/storage-utils";
-import { saveRecipientDataToStorage, getRecipientDataFromStorage, saveTemplateToStorage, getTemplateFromStorage } from "@/lib/storage-utils";
+import { 
+  saveRecipientDataToStorage, 
+  getRecipientDataFromStorage, 
+  saveTemplateToStorage, 
+  getTemplateFromStorage,
+  saveSubjectToStorage,
+  getSubjectFromStorage
+} from "@/lib/storage-utils";
 import { useToast } from "@/hooks/use-toast";
 import { Analytics } from "@vercel/analytics/react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,6 +35,8 @@ El motivo de la anulación junto con el detalle de los comprobantes, se encuentr
 
 {{invoices_table}}
 `;
+
+const DEFAULT_SUBJECT = "Anulación de comprobantes";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -83,6 +92,7 @@ export default function Home() {
   // Final processed data
   const [processedData, setProcessedData] = useState<Map<string, GroupedData> | null>(null);
   const [emailTemplate, setEmailTemplate] = useState<string>(DEFAULT_EMAIL_TEMPLATE);
+  const [emailSubject, setEmailSubject] = useState<string>(DEFAULT_SUBJECT);
 
   const { toast } = useToast();
 
@@ -117,6 +127,12 @@ export default function Home() {
     if (storedTemplate) {
       setEmailTemplate(storedTemplate);
     }
+
+    // Load Subject
+    const storedSubject = getSubjectFromStorage();
+    if (storedSubject) {
+      setEmailSubject(storedSubject);
+    }
   }, [isMounted, toast]);
 
   // Save template on change
@@ -126,9 +142,18 @@ export default function Home() {
     }
   }, [emailTemplate]);
 
+  // Save subject on change
+  useEffect(() => {
+    if (emailSubject !== DEFAULT_SUBJECT) {
+      saveSubjectToStorage(emailSubject);
+    }
+  }, [emailSubject]);
+
   const handleResetTemplate = () => {
     setEmailTemplate(DEFAULT_EMAIL_TEMPLATE);
+    setEmailSubject(DEFAULT_SUBJECT);
     localStorage.removeItem('hola-mails-template');
+    localStorage.removeItem('hola-mails-subject');
     toast({
       title: "Mensaje Reiniciado",
       description: "Se ha restaurado el formato predeterminado.",
@@ -500,6 +525,8 @@ export default function Home() {
                   data={processedData}
                   emailTemplate={emailTemplate}
                   onTemplateChange={setEmailTemplate}
+                  emailSubject={emailSubject}
+                  onSubjectChange={setEmailSubject}
                   onNext={handleGenerate}
                   onBack={handleBack}
                   onEditMapping={() => setStep(2)}
@@ -526,6 +553,7 @@ export default function Home() {
                   <GenerateStep
                     data={processedData}
                     emailTemplate={emailTemplate}
+                    emailSubject={emailSubject}
                     onBack={handleBack}
                     onStartOver={handleStartOver}
                     sentEmails={sentEmails}

@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'hola-mails-recipients';
 const TEMPLATE_KEY = 'hola-mails-template';
+const SUBJECT_KEY = 'hola-mails-subject';
 
 export interface StoredRecipientData {
   recipientData: any[];
@@ -39,6 +40,23 @@ export function getTemplateFromStorage(): string | null {
     return localStorage.getItem(TEMPLATE_KEY);
   } catch (error) {
     console.error('Failed to read template from localStorage:', error);
+    return null;
+  }
+}
+
+export function saveSubjectToStorage(subject: string): void {
+  try {
+    localStorage.setItem(SUBJECT_KEY, subject);
+  } catch (error) {
+    console.error('Failed to save subject to localStorage:', error);
+  }
+}
+
+export function getSubjectFromStorage(): string | null {
+  try {
+    return localStorage.getItem(SUBJECT_KEY);
+  } catch (error) {
+    console.error('Failed to read subject from localStorage:', error);
     return null;
   }
 }

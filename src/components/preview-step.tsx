@@ -14,13 +14,25 @@ interface PreviewStepProps {
     data: Map<string, GroupedData>;
     emailTemplate: string;
     onTemplateChange: (template: string) => void;
+    emailSubject: string;
+    onSubjectChange: (subject: string) => void;
     onNext: () => void;
     onBack: () => void;
     onEditMapping?: () => void;
     onResetTemplate?: () => void;
 }
 
-export function PreviewStep({ data, emailTemplate, onTemplateChange, onNext, onBack, onEditMapping, onResetTemplate }: PreviewStepProps) {
+export function PreviewStep({ 
+    data, 
+    emailTemplate, 
+    onTemplateChange, 
+    emailSubject, 
+    onSubjectChange, 
+    onNext, 
+    onBack, 
+    onEditMapping, 
+    onResetTemplate 
+}: PreviewStepProps) {
     const dataArray = Array.from(data.values());
 
     const availableTags = [
@@ -167,6 +179,19 @@ export function PreviewStep({ data, emailTemplate, onTemplateChange, onNext, onB
                             </div>
                         </CardHeader>
                         <CardContent className="pt-6 space-y-6">
+                            <div className="space-y-3">
+                                <Label htmlFor="email-subject" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">
+                                    Asunto del Correo
+                                </Label>
+                                <Textarea
+                                    id="email-subject"
+                                    placeholder="Asunto del correo..."
+                                    className="min-h-[80px] font-sans text-sm border-2 focus:border-primary resize-none rounded-2xl shadow-inner bg-muted/20"
+                                    value={emailSubject}
+                                    onChange={(e) => onSubjectChange(e.target.value)}
+                                />
+                            </div>
+
                             <div className="space-y-3">
                                 <Label htmlFor="email-template" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">
                                     Cuerpo del Mensaje
