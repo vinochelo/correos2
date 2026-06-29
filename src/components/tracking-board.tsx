@@ -63,6 +63,12 @@ export function TrackingBoard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<"active" | "concluded">("active");
+
+  const handleTabChange = (tab: "active" | "concluded") => {
+    setActiveTab(tab);
+    setSelectedIds(new Set());
+  };
 
   // Modals state
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -135,7 +141,27 @@ export function TrackingBoard() {
   };
 
   // Filtering Logic
+  const activeCount = documents.filter(doc => {
+    const isConcluido = doc.status === "Anulado SRI" || 
+                        doc.estadoSri?.toLowerCase().includes("anulado") || 
+                        (doc.status === "Nota Credito" && doc.saldoNeto === 0);
+    return !isConcluido;
+  }).length;
+
+  const concludedCount = documents.filter(doc => {
+    const isConcluido = doc.status === "Anulado SRI" || 
+                        doc.estadoSri?.toLowerCase().includes("anulado") || 
+                        (doc.status === "Nota Credito" && doc.saldoNeto === 0);
+    return isConcluido;
+  }).length;
+
   const filteredDocs = documents.filter(doc => {
+    const isConcluido = doc.status === "Anulado SRI" || 
+                        doc.estadoSri?.toLowerCase().includes("anulado") || 
+                        (doc.status === "Nota Credito" && doc.saldoNeto === 0);
+
+    const matchesTab = activeTab === "concluded" ? isConcluido : !isConcluido;
+
     const matchesSearch = 
       doc.razonSocialEmisor.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doc.rucEmisor.includes(searchQuery) ||
@@ -145,7 +171,7 @@ export function TrackingBoard() {
     const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
     const matchesType = typeFilter === "all" || doc.tipoComprobante === typeFilter;
 
-    return matchesSearch && matchesStatus && matchesType;
+    return matchesTab && matchesSearch && matchesStatus && matchesType;
   });
 
   // Export to Excel
@@ -363,7 +389,13 @@ export function TrackingBoard() {
       } else if (result.estado_encontrado === "Rechazado") {
         mappedStatus = "Rechazado";
       } else if (result.estado_encontrado === "Pendiente") {
-        mappedStatus = "Pendiente";
+        // Preserve state if it is already Solicitado, Nota Credito, Anulado SRI or Rechazado.
+        // The robot returns 'Pendiente' to indicate it is still active/unresolved in SAP.
+        if (doc.status === "Solicitado" || doc.status === "Rechazado" || doc.status === "Nota Credito" || doc.status === "Anulado SRI") {
+          mappedStatus = doc.status;
+        } else {
+          mappedStatus = "Pendiente";
+        }
       }
 
       let estadoSri = result.estado_sri || "";
@@ -632,6 +664,44 @@ export function TrackingBoard() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Segmented Control for Active / Concluded Tabs */}
+      <div className="flex border-b border-muted mb-4 mt-6">
+        <button
+          onClick={() => handleTabChange("active")}
+          className={cn(
+            "pb-3 pt-2 px-6 text-sm font-bold border-b-2 transition-all gap-2 flex items-center relative",
+            activeTab === "active"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <span>En Seguimiento</span>
+          <Badge className={cn(
+            "text-[10px] font-bold h-5 px-2 rounded-full",
+            activeTab === "active" ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+          )}>
+            {activeCount}
+          </Badge>
+        </button>
+        <button
+          onClick={() => handleTabChange("concluded")}
+          className={cn(
+            "pb-3 pt-2 px-6 text-sm font-bold border-b-2 transition-all gap-2 flex items-center relative",
+            activeTab === "concluded"
+              ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <span>Concluidos</span>
+          <Badge className={cn(
+            "text-[10px] font-bold h-5 px-2 rounded-full",
+            activeTab === "concluded" ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"
+          )}>
+            {concludedCount}
+          </Badge>
+        </button>
       </div>
 
       {/* Filter and Search Bar Card */}
