@@ -45,5 +45,6 @@ export interface TrackedDocument {
   valorNotaCredito?: number; // Obtenido del robot
   saldoNeto?: number; // Obtenido del robot
   notaCreditoAsociada?: string; // Obtenido del robot
+  estadoSri?: string; // Obtenido del robot
 }
 

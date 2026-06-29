@@ -366,6 +366,15 @@ export function TrackingBoard() {
         mappedStatus = "Pendiente";
       }
 
+      let estadoSri = result.estado_sri || "";
+      if (!estadoSri) {
+        const textToSearch = result.notas || result.notes || "";
+        const sriMatch = textToSearch.match(/Estado en el SRI:\s*([A-Za-zÀ-ÿ0-9\s]+)/i);
+        if (sriMatch) {
+          estadoSri = sriMatch[1].trim();
+        }
+      }
+
       return {
         ...doc,
         status: mappedStatus,
@@ -373,6 +382,7 @@ export function TrackingBoard() {
         valorNotaCredito: result.valor_nota_credito,
         saldoNeto: result.saldo_neto,
         notaCreditoAsociada: result.nota_credito_asociada,
+        estadoSri: estadoSri || undefined,
         notas: result.notas ? `${result.notas}\n[Sincronizado: ${new Date().toLocaleString()}]` : doc.notas,
         fechaActualizacion: new Date().toISOString()
       };
@@ -800,13 +810,29 @@ export function TrackingBoard() {
 
                       {/* Documento */}
                       <TableCell>
-                        <div className="flex flex-col">
+                        <div className="flex flex-col items-start">
                           <span className="text-xs font-black text-foreground">
                             {doc.serieComprobante}
                           </span>
                           <span className="text-[9px] font-bold uppercase text-muted-foreground/80 tracking-widest mt-0.5">
                             {doc.tipoComprobante || "Factura"}
                           </span>
+                          {doc.estadoSri ? (
+                            <span className={cn(
+                              "inline-flex items-center gap-1 text-[8px] font-black px-1.5 py-0.5 rounded mt-1 border",
+                              doc.estadoSri.toLowerCase().includes("autorizado")
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50"
+                                : doc.estadoSri.toLowerCase().includes("anulado")
+                                ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50"
+                                : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/50"
+                            )}>
+                              SRI: {doc.estadoSri}
+                            </span>
+                          ) : (
+                            <span className="text-[8px] font-bold text-muted-foreground/60 mt-1">
+                              SRI: Sin consultar
+                            </span>
+                          )}
                         </div>
                       </TableCell>
 
