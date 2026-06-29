@@ -150,14 +150,13 @@ export function addAllDocumentsToTracking(data: Map<string, GroupedData>): void 
           serieComprobante: inv.SERIE_COMPROBANTE,
           observaciones: inv.OBSERVACIONES,
           correoEmisor: recipientEmail,
-          status: 'Solicitado',
+          status: 'Pendiente',
           fechaCreacion: now,
           fechaActualizacion: now,
         });
       } else {
         updatedDocs[existsIdx] = {
           ...updatedDocs[existsIdx],
-          status: 'Solicitado',
           correoEmisor: updatedDocs[existsIdx].correoEmisor || recipientEmail,
           fechaActualizacion: now,
         };

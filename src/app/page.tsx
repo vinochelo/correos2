@@ -21,7 +21,8 @@ import {
   saveTemplateToStorage, 
   getTemplateFromStorage,
   saveSubjectToStorage,
-  getSubjectFromStorage
+  getSubjectFromStorage,
+  addAllDocumentsToTracking
 } from "@/lib/storage-utils";
 import { useToast } from "@/hooks/use-toast";
 import { Analytics } from "@vercel/analytics/react";
@@ -375,6 +376,9 @@ export default function Home() {
       recipientCount: mappedRecipients.length,
     };
     saveRecipientDataToStorage(storageData);
+
+    // Automatically sync all invoices into the tracking board
+    addAllDocumentsToTracking(data);
 
     setProcessedData(data);
     setStep(3);
