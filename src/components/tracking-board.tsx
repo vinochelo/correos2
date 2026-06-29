@@ -860,18 +860,54 @@ export function TrackingBoard() {
                       {/* Saldo / NC Asociada */}
                       <TableCell>
                         {doc.saldoNeto !== undefined ? (
-                          <div className="flex flex-col">
-                            <span className={cn(
-                              "text-xs font-black",
-                              doc.saldoNeto === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600"
-                            )}>
-                              Saldo: ${doc.saldoNeto.toFixed(2)}
-                            </span>
-                            {doc.notaCreditoAsociada && (
-                              <span className="text-[9px] font-black text-muted-foreground truncate max-w-[120px] tracking-wider mt-0.5" title={`NC: ${doc.notaCreditoAsociada}`}>
-                                NC: {doc.notaCreditoAsociada}
-                              </span>
-                            )}
+                          <div className="flex flex-col items-start gap-0.5">
+                            {(() => {
+                              const hasNC = !!doc.notaCreditoAsociada || (doc.valorNotaCredito !== undefined && doc.valorNotaCredito > 0);
+                              const valorFactura = doc.valorFactura ?? 0;
+                              const valorNC = doc.valorNotaCredito ?? 0;
+                              const saldo = doc.saldoNeto ?? 0;
+
+                              if (!hasNC) {
+                                return (
+                                  <>
+                                    <span className="text-xs font-black text-amber-600 dark:text-amber-400">
+                                      Saldo: ${valorFactura.toFixed(2)}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-muted-foreground/60 tracking-wider">
+                                      Sin NC asociada
+                                    </span>
+                                  </>
+                                );
+                              } else {
+                                const tieneDiferencia = Math.abs(saldo) > 0.01;
+                                if (tieneDiferencia) {
+                                  return (
+                                    <>
+                                      <span className="text-xs font-black text-rose-600 dark:text-rose-400" title={`Factura: $${valorFactura.toFixed(2)} | NC: $${valorNC.toFixed(2)}`}>
+                                        Diferencia: ${saldo.toFixed(2)}
+                                      </span>
+                                      <span className="text-[9px] font-bold text-muted-foreground truncate max-w-[140px] tracking-wider" title={`NC: ${doc.notaCreditoAsociada}`}>
+                                        NC: {doc.notaCreditoAsociada || "S/N"} (${valorNC.toFixed(2)})
+                                      </span>
+                                      <span className="text-[8px] font-medium text-muted-foreground/70">
+                                        Factura original: ${valorFactura.toFixed(2)}
+                                      </span>
+                                    </>
+                                  );
+                                } else {
+                                  return (
+                                    <>
+                                      <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                                        Anulado con NC: ${valorNC.toFixed(2)}
+                                      </span>
+                                      <span className="text-[9px] font-bold text-muted-foreground truncate max-w-[140px] tracking-wider" title={`NC: ${doc.notaCreditoAsociada}`}>
+                                        NC: {doc.notaCreditoAsociada || "S/N"}
+                                      </span>
+                                    </>
+                                  );
+                                }
+                              }
+                            })()}
                           </div>
                         ) : (
                           <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Sin Consultar</span>
