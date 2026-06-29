@@ -819,7 +819,7 @@ export function TrackingBoard() {
                           </span>
                           {doc.estadoSri ? (
                             <span className={cn(
-                              "inline-flex items-center gap-1 text-[8px] font-black px-1.5 py-0.5 rounded mt-1 border",
+                              "inline-flex items-center gap-1 text-xs font-black px-2 py-0.5 rounded mt-1 border shadow-sm",
                               doc.estadoSri.toLowerCase().includes("autorizado")
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50"
                                 : doc.estadoSri.toLowerCase().includes("anulado")
@@ -829,7 +829,7 @@ export function TrackingBoard() {
                               SRI: {doc.estadoSri}
                             </span>
                           ) : (
-                            <span className="text-[8px] font-bold text-muted-foreground/60 mt-1">
+                            <span className="text-xs font-bold text-muted-foreground/60 mt-1">
                               SRI: Sin consultar
                             </span>
                           )}
@@ -869,14 +869,9 @@ export function TrackingBoard() {
 
                               if (!hasNC) {
                                 return (
-                                  <>
-                                    <span className="text-xs font-black text-amber-600 dark:text-amber-400">
-                                      Saldo: ${valorFactura.toFixed(2)}
-                                    </span>
-                                    <span className="text-[9px] font-bold text-muted-foreground/60 tracking-wider">
-                                      Sin NC asociada
-                                    </span>
-                                  </>
+                                  <span className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider leading-relaxed">
+                                    Sin NC asociada
+                                  </span>
                                 );
                               } else {
                                 const tieneDiferencia = Math.abs(saldo) > 0.01;
