@@ -335,12 +335,13 @@ export function TrackingBoard() {
   // Call Robot API
   const queryRobotForDoc = async (doc: TrackedDocument): Promise<TrackedDocument | null> => {
     try {
-      const response = await fetch(`${robotUrl}/api/consultar-documento`, {
+      const response = await fetch("/api/consultar-documento", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          robotUrl,
           ruc_proveedor: doc.rucEmisor,
           nombre_proveedor: doc.razonSocialEmisor,
           factura_numero: doc.serieComprobante
