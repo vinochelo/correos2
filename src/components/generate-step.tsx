@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import type { GroupedData, Invoice } from "@/lib/types";
 import { Mail, Send, RotateCcw, CheckCircle, AlertTriangle, Pencil, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { addDocumentsToTracking, addAllDocumentsToTracking } from "@/lib/storage-utils";
 
 interface GenerateStepProps {
   data: Map<string, GroupedData>;
@@ -52,13 +54,30 @@ export function GenerateStep({ data, emailTemplate, emailSubject, onBack, onStar
   const emailsPending = emailsWithContact - emailsSent;
   const missingEmails = totalEmails - emailsWithContact;
 
-  const handleOpenInOutlook = (recipientRuc: string, recipientEmail: string, subject: string, body: string) => {
+  const { toast } = useToast();
+
+  const handleOpenInOutlook = (recipientRuc: string, recipientEmail: string, subject: string, body: string, invoices: Invoice[]) => {
     const mailtoLink = `mailto:${recipientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailtoLink;
 
     const newSent = new Set(sentEmails);
     newSent.add(recipientRuc);
     setSentEmails(newSent);
+
+    // Track documents
+    addDocumentsToTracking(invoices, recipientEmail);
+    toast({
+      title: "Registrado en Seguimiento",
+      description: `Se han añadido ${invoices.length} comprobantes al tablero de control.`
+    });
+  };
+
+  const handleRegisterBatch = () => {
+    addAllDocumentsToTracking(data);
+    toast({
+      title: "Lote Registrado",
+      description: `Se registraron todos los comprobantes de los ${data.size} emisores en el tablero de seguimiento.`
+    });
   };
 
   return (
@@ -177,7 +196,7 @@ export function GenerateStep({ data, emailTemplate, emailSubject, onBack, onStar
                       "w-full h-12 rounded-xl font-bold shadow-xl transition-all hover:scale-[1.02] active:scale-95",
                       isSent && "border-green-600/20 text-green-600 hover:bg-green-600 hover:text-white"
                     )}
-                    onClick={() => handleOpenInOutlook(recipient.RUC, recipientEmails, subject, body)}
+                    onClick={() => handleOpenInOutlook(recipient.RUC, recipientEmails, subject, body, invoices)}
                   >
                     {isSent ? (
                       <>
@@ -204,7 +223,7 @@ export function GenerateStep({ data, emailTemplate, emailSubject, onBack, onStar
       </div>
 
       <div className="mt-20 flex flex-col items-center gap-8">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-center gap-4">
           <Button 
             variant="ghost" 
             size="lg" 
@@ -221,6 +240,15 @@ export function GenerateStep({ data, emailTemplate, emailSubject, onBack, onStar
           >
             <RotateCcw className="mr-2 h-5 w-5" />
             Finalizar y Limpiar Todo
+          </Button>
+          <Button 
+            size="lg" 
+            variant="default"
+            className="h-14 px-10 font-bold shadow-xl transition-all bg-teal-600 hover:bg-teal-700 text-white hover:scale-[1.02] active:scale-95" 
+            onClick={handleRegisterBatch}
+          >
+            <CheckCircle className="mr-2 h-5 w-5" />
+            Registrar lote en Seguimiento
           </Button>
         </div>
         

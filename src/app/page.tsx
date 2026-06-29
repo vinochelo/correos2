@@ -8,8 +8,10 @@ import { UploadStep } from "@/components/upload-step";
 import { MappingStep } from "@/components/mapping-step";
 import { PreviewStep } from "@/components/preview-step";
 import { GenerateStep } from "@/components/generate-step";
-import { Settings2 } from "lucide-react";
+import { Settings2, MailOpen, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TrackingBoard } from "@/components/tracking-board";
 
 import type { Recipient, Invoice, GroupedData, ColumnMapping, ExcelPreview } from "@/lib/types";
 import type { StoredRecipientData } from "@/lib/storage-utils";
@@ -483,87 +485,110 @@ export default function Home() {
       
       <Header step={step} emailsSent={sentEmails.size} totalEmails={processedData ? processedData.size : 0} />
       
-      <main className="relative pt-12 pb-24">
-        <div className="max-w-4xl mx-auto px-4 mb-20">
-          <Stepper currentStep={step} steps={STEPS} />
-        </div>
+      <main className="relative pt-6 pb-24">
+        <Tabs defaultValue="campaigns" className="w-full">
+          <div className="max-w-md mx-auto px-4 mb-12 flex justify-center">
+            <TabsList className="grid w-full grid-cols-2 p-1 bg-muted/40 border-2 rounded-2xl h-12">
+              <TabsTrigger value="campaigns" className="rounded-xl font-bold gap-2 text-xs h-10 data-[state=active]:shadow-md">
+                <MailOpen className="h-4 w-4 text-primary" />
+                Campañas de Envío
+              </TabsTrigger>
+              <TabsTrigger value="tracking" className="rounded-xl font-bold gap-2 text-xs h-10 data-[state=active]:shadow-md">
+                <ClipboardList className="h-4 w-4 text-primary" />
+                Seguimiento
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-        <div className="container mx-auto px-4 px-6 lg:px-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={step}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ 
-                duration: 0.4, 
-                ease: [0.22, 1, 0.36, 1] 
-              }}
-            >
-              {step === 1 && (
-                <UploadStep
-                  onProcess={handleStartMapping}
-                  onRecipientsUpload={handleRecipientsUpload}
-                  onInvoicesUpload={handleInvoicesUpload}
-                  onLoadRecipients={handleLoadRecipients}
-                  recipientFile={recipientFile}
-                  invoiceFile={invoiceFile}
-                />
-              )}
+          <TabsContent value="campaigns" className="outline-none focus:outline-none">
+            <div className="max-w-4xl mx-auto px-4 mb-20">
+              <Stepper currentStep={step} steps={STEPS} />
+            </div>
 
-              {step === 2 && recipientPreview && invoicePreview && (
-                <MappingStep
-                  recipientPreview={recipientPreview}
-                  invoicePreview={invoicePreview}
-                  onMap={handleProcessAndContinue}
-                  onBack={handleBack}
-                />
-              )}
-
-              {step === 3 && processedData && (
-                <PreviewStep
-                  data={processedData}
-                  emailTemplate={emailTemplate}
-                  onTemplateChange={setEmailTemplate}
-                  emailSubject={emailSubject}
-                  onSubjectChange={setEmailSubject}
-                  onNext={handleGenerate}
-                  onBack={handleBack}
-                  onEditMapping={() => setStep(2)}
-                  onResetTemplate={handleResetTemplate}
-                />
-              )}
-
-              {step === 4 && processedData && (
-                <div className="space-y-8">
-                  {processedData.size > 100 && (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="max-w-xl mx-auto p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-4 shadow-sm"
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white">
-                        <Settings2 className="h-5 w-5" />
-                      </div>
-                      <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-tight leading-relaxed">
-                        Límite de Procesamiento de Lote detectado. Se recomienda el envío en bloques para evitar saturación del cliente Outlook/Mail local.
-                      </p>
-                    </motion.div>
+            <div className="container mx-auto px-4 px-6 lg:px-8">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={step}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ 
+                    duration: 0.4, 
+                    ease: [0.22, 1, 0.36, 1] 
+                  }}
+                >
+                  {step === 1 && (
+                    <UploadStep
+                      onProcess={handleStartMapping}
+                      onRecipientsUpload={handleRecipientsUpload}
+                      onInvoicesUpload={handleInvoicesUpload}
+                      onLoadRecipients={handleLoadRecipients}
+                      recipientFile={recipientFile}
+                      invoiceFile={invoiceFile}
+                    />
                   )}
-                  <GenerateStep
-                    data={processedData}
-                    emailTemplate={emailTemplate}
-                    emailSubject={emailSubject}
-                    onBack={handleBack}
-                    onStartOver={handleStartOver}
-                    sentEmails={sentEmails}
-                    setSentEmails={setSentEmails}
-                  />
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
+
+                  {step === 2 && recipientPreview && invoicePreview && (
+                    <MappingStep
+                      recipientPreview={recipientPreview}
+                      invoicePreview={invoicePreview}
+                      onMap={handleProcessAndContinue}
+                      onBack={handleBack}
+                    />
+                  )}
+
+                  {step === 3 && processedData && (
+                    <PreviewStep
+                      data={processedData}
+                      emailTemplate={emailTemplate}
+                      onTemplateChange={setEmailTemplate}
+                      emailSubject={emailSubject}
+                      onSubjectChange={setEmailSubject}
+                      onNext={handleGenerate}
+                      onBack={handleBack}
+                      onEditMapping={() => setStep(2)}
+                      onResetTemplate={handleResetTemplate}
+                    />
+                  )}
+
+                  {step === 4 && processedData && (
+                    <div className="space-y-8">
+                      {processedData.size > 100 && (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="max-w-xl mx-auto p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-4 shadow-sm"
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white">
+                            <Settings2 className="h-5 w-5" />
+                          </div>
+                          <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-tight leading-relaxed">
+                            Límite de Procesamiento de Lote detectado. Se recomienda el envío en bloques para evitar saturación del cliente Outlook/Mail local.
+                          </p>
+                        </motion.div>
+                      )}
+                      <GenerateStep
+                        data={processedData}
+                        emailTemplate={emailTemplate}
+                        emailSubject={emailSubject}
+                        onBack={handleBack}
+                        onStartOver={handleStartOver}
+                        sentEmails={sentEmails}
+                        setSentEmails={setSentEmails}
+                      />
+                    </div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="tracking" className="outline-none focus:outline-none">
+            <div className="container mx-auto px-4 px-6 lg:px-8">
+              <TrackingBoard />
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
 
       <footer className="border-t bg-muted/20 py-12">
