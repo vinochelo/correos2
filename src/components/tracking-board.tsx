@@ -941,10 +941,9 @@ export function TrackingBoard() {
                                 </div>
                               </div>
                             ) : doc.status === 'Anulado SRI' ? (
-                              <div>
-                                <span className="font-semibold text-emerald-600 dark:text-emerald-400">Saldo Neto: $0.00</span>
-                                <div className="text-xs text-muted-foreground mt-0.5">Sin NC (Anulado SRI)</div>
-                              </div>
+                              <span className="text-muted-foreground font-medium text-xs">
+                                Sin NC (Anulado SRI)
+                              </span>
                             ) : (
                               <span className="text-muted-foreground font-medium text-xs">SIN NC ASOCIADA</span>
                             )}
